@@ -1,0 +1,109 @@
+{
+  "name": "SQL",
+  "scopeName": "source.sql",
+  "fileTypes": [
+    "sql",
+    "ddl"
+  ],
+  "patterns": [
+    {
+      "match": "--.*$",
+      "name": "comment.line.double-dash.sql"
+    },
+    {
+      "match": "^[ \\t]*#.*$",
+      "name": "comment.line.number-sign.sql"
+    },
+    {
+      "begin": "/\\*",
+      "end": "\\*/",
+      "name": "comment.block.sql"
+    },
+    {
+      "begin": "(\\$([A-Za-z_]\\w*)?\\$)",
+      "end": "(\\$\\2\\$)",
+      "name": "string.quoted.dollar.sql"
+    },
+    {
+      "begin": "(?i)(?:\\b[enbx])?'",
+      "end": "'(?!')",
+      "name": "string.quoted.single.sql",
+      "patterns": [
+        {
+          "match": "''",
+          "name": "constant.character.escape.sql"
+        },
+        {
+          "match": "\\\\.",
+          "name": "constant.character.escape.sql"
+        }
+      ]
+    },
+    {
+      "begin": "\"",
+      "end": "\"",
+      "name": "variable.other.quoted.sql string.quoted.identifier.sql"
+    },
+    {
+      "begin": "`",
+      "end": "`",
+      "name": "variable.other.quoted.sql string.quoted.identifier.sql"
+    },
+    {
+      "match": "(?i)\\b(create|alter|drop|truncate)[ \\t]+(?:(?:or[ \\t]+replace|temp|temporary|unique|materialized|virtual|unlogged)[ \\t]+)*(table|view|index|trigger|function|procedure|schema|database|sequence|type|extension)[ \\t]+(?:(if[ \\t]+(?:not[ \\t]+)?exists)[ \\t]+)?((?:\"[^\"]+\"|`[^`]+`|\\[[^\\]]+\\]|[A-Za-z_][\\w$]*)(?:\\.(?:\"[^\"]+\"|`[^`]+`|\\[[^\\]]+\\]|[A-Za-z_][\\w$]*))*)",
+      "captures": {
+        "1": {
+          "name": "keyword.other.create.sql"
+        },
+        "2": {
+          "name": "keyword.other.sql"
+        },
+        "3": {
+          "name": "keyword.other.sql"
+        },
+        "4": {
+          "name": "entity.name.type.table.sql"
+        }
+      }
+    },
+    {
+      "match": "(?i)\\b(from|join|into|update|references|table)[ \\t]+(?!(?:select|if|not|exists|lateral|only|with|set)\\b)((?:\"[^\"]+\"|`[^`]+`|[A-Za-z_][\\w$]*)(?:\\.(?:\"[^\"]+\"|`[^`]+`|[A-Za-z_][\\w$]*))*)",
+      "captures": {
+        "1": {
+          "name": "keyword.other.sql"
+        },
+        "2": {
+          "name": "entity.name.type.table.sql"
+        }
+      }
+    },
+    {
+      "match": "(?i)\\b(?:true|false|null)\\b",
+      "name": "keyword.constant.sql constant.language.sql"
+    },
+    {
+      "match": "(?i)\\b(?:timestamptz|bigserial|mediumint|timestamp|varbinary|datetime|interval|nvarchar|smallint|boolean|decimal|integer|numeric|tinyint|varchar|bigint|binary|double|serial|bytea|float|jsonb|money|nchar|blob|bool|char|clob|date|enum|json|real|text|time|uuid|bit|int)\\b",
+      "name": "entity.name.type.sql storage.type.sql"
+    },
+    {
+      "match": "(?i)\\b(?:current_timestamp|current_date|date_trunc|dense_rank|row_number|substring|coalesce|greatest|extract|concat|ifnull|length|nullif|count|floor|least|lower|ltrim|round|rtrim|upper|cast|ceil|lead|rank|trim|abs|avg|lag|max|min|now|sum)(?=[ \\t]*\\()",
+      "name": "entity.name.function.sql support.function.sql"
+    },
+    {
+      "match": "(?i)\\b(?:auto_increment|autoincrement|transaction|constraint|references|intersect|partition|procedure|returning|temporary|conflict|database|distinct|function|rollback|truncate|between|cascade|collate|default|explain|foreign|natural|nothing|primary|replace|trigger|column|commit|create|delete|escape|except|exists|having|insert|offset|rename|revoke|schema|select|unique|update|upsert|values|window|alter|begin|check|cross|fetch|grant|group|index|inner|limit|order|outer|right|table|union|using|where|case|desc|drop|else|from|full|into|join|left|like|over|then|view|when|with|add|all|and|any|asc|end|key|not|set|as|by|do|if|in|is|on|or|to|after|analyze|before|each|for|identity|ignore|instead|language|lateral|leading|limit|lock|nulls|of|only|plan|pragma|recursive|release|returns|row|rows|savepoint|share|show|start|trailing|unsigned|use|vacuum|work|zerofill|declare|exec|execute|go|print|top|merge|matched|filter|first|last|range|preceding|following|unbounded|current|ilike|similar|asc|desc|cascade|restrict|action|no|deferrable|initially|deferred|immediate|without|zone|varying|precision|extension|sequence|type|domain|policy|role|user|owner|comment|returning|enable|disable|offset)\\b",
+      "name": "keyword.other.sql"
+    },
+    {
+      "match": "\\b[A-Za-z_][\\w$]*(?=[ \\t]*\\()",
+      "name": "entity.name.function.sql"
+    },
+    {
+      "match": "(?<![\\w.$])(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][-+]?\\d+)?\\b",
+      "name": "constant.numeric.sql"
+    },
+    {
+      "match": "(?<![\\w:])(?::[A-Za-z_]\\w*|@[A-Za-z_]\\w*|\\$\\d+|\\?)",
+      "name": "variable.parameter.sql"
+    }
+  ]
+}

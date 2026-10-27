@@ -1,0 +1,226 @@
+{
+  "name": "XML",
+  "scopeName": "text.xml",
+  "fileTypes": [
+    "xml",
+    "xsd",
+    "xsl",
+    "xslt",
+    "plist",
+    "rss",
+    "atom",
+    "wsdl",
+    "kml",
+    "gpx"
+  ],
+  "patterns": [
+    {
+      "begin": "<!--",
+      "end": "-->",
+      "name": "comment.block.xml"
+    },
+    {
+      "begin": "<!\\[CDATA\\[",
+      "end": "\\]\\]>",
+      "name": "string.unquoted.cdata.xml",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.begin.xml"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.end.xml"
+        }
+      }
+    },
+    {
+      "begin": "(<\\?)([A-Za-z_:][\\w:.-]*)",
+      "end": "\\?>",
+      "name": "meta.tag.preprocessor.xml",
+      "beginCaptures": {
+        "2": {
+          "name": "keyword.other.preprocessor.xml entity.name.tag.xml"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#attribute"
+        }
+      ]
+    },
+    {
+      "begin": "(<!)(DOCTYPE|doctype)\\b",
+      "end": ">",
+      "name": "meta.tag.sgml.doctype.xml",
+      "beginCaptures": {
+        "2": {
+          "name": "keyword.other.doctype.xml"
+        }
+      },
+      "patterns": [
+        {
+          "begin": "\\[",
+          "end": "\\]",
+          "patterns": [
+            {
+              "begin": "<!--",
+              "end": "-->",
+              "name": "comment.block.xml"
+            },
+            {
+              "match": "<!(ENTITY|ELEMENT|ATTLIST|NOTATION)\\b",
+              "name": "keyword.other.declaration.xml"
+            },
+            {
+              "begin": "\"",
+              "end": "\"",
+              "name": "string.quoted.double.xml",
+              "patterns": [
+                {
+                  "match": "&(?:#\\d+|#x[0-9a-fA-F]+|[A-Za-z_][\\w.-]*);",
+                  "name": "variable.other.entity.xml constant.character.entity.xml"
+                },
+                {
+                  "match": "&",
+                  "name": "invalid.illegal.bad-ampersand.xml"
+                }
+              ]
+            },
+            {
+              "begin": "'",
+              "end": "'",
+              "name": "string.quoted.single.xml",
+              "patterns": [
+                {
+                  "match": "&(?:#\\d+|#x[0-9a-fA-F]+|[A-Za-z_][\\w.-]*);",
+                  "name": "variable.other.entity.xml constant.character.entity.xml"
+                },
+                {
+                  "match": "&",
+                  "name": "invalid.illegal.bad-ampersand.xml"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "begin": "\"",
+          "end": "\"",
+          "name": "string.quoted.double.xml",
+          "patterns": [
+            {
+              "match": "&(?:#\\d+|#x[0-9a-fA-F]+|[A-Za-z_][\\w.-]*);",
+              "name": "variable.other.entity.xml constant.character.entity.xml"
+            },
+            {
+              "match": "&",
+              "name": "invalid.illegal.bad-ampersand.xml"
+            }
+          ]
+        },
+        {
+          "begin": "'",
+          "end": "'",
+          "name": "string.quoted.single.xml",
+          "patterns": [
+            {
+              "match": "&(?:#\\d+|#x[0-9a-fA-F]+|[A-Za-z_][\\w.-]*);",
+              "name": "variable.other.entity.xml constant.character.entity.xml"
+            },
+            {
+              "match": "&",
+              "name": "invalid.illegal.bad-ampersand.xml"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "begin": "(</?)(?:([A-Za-z_:][\\w:.-]*)(:))?([A-Za-z_:][\\w:.-]*)",
+      "end": "(/?>)",
+      "name": "meta.tag.xml",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.tag.xml"
+        },
+        "2": {
+          "name": "entity.name.type.namespace.xml entity.name.tag.namespace.xml"
+        },
+        "3": {
+          "name": "punctuation.separator.namespace.xml"
+        },
+        "4": {
+          "name": "keyword.other.tag.xml entity.name.tag.localname.xml"
+        }
+      },
+      "endCaptures": {
+        "1": {
+          "name": "punctuation.definition.tag.xml"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#attribute"
+        }
+      ]
+    },
+    {
+      "match": "&(?:#\\d+|#x[0-9a-fA-F]+|[A-Za-z_][\\w.-]*);",
+      "name": "variable.other.entity.xml constant.character.entity.xml"
+    }
+  ],
+  "repository": {
+    "attribute": {
+      "patterns": [
+        {
+          "match": "(?<=\\s)(?:([A-Za-z_:][\\w:.-]*)(:))?([A-Za-z_:][\\w:.-]*)[ \\t]*(=)?",
+          "captures": {
+            "1": {
+              "name": "entity.name.type.namespace.xml entity.other.attribute-name.namespace.xml"
+            },
+            "2": {
+              "name": "punctuation.separator.namespace.xml"
+            },
+            "3": {
+              "name": "variable.other.attribute.xml entity.other.attribute-name.xml"
+            },
+            "4": {
+              "name": "punctuation.separator.key-value.xml"
+            }
+          }
+        },
+        {
+          "begin": "\"",
+          "end": "\"",
+          "name": "string.quoted.double.xml",
+          "patterns": [
+            {
+              "match": "&(?:#\\d+|#x[0-9a-fA-F]+|[A-Za-z_][\\w.-]*);",
+              "name": "variable.other.entity.xml constant.character.entity.xml"
+            },
+            {
+              "match": "&",
+              "name": "invalid.illegal.bad-ampersand.xml"
+            }
+          ]
+        },
+        {
+          "begin": "'",
+          "end": "'",
+          "name": "string.quoted.single.xml",
+          "patterns": [
+            {
+              "match": "&(?:#\\d+|#x[0-9a-fA-F]+|[A-Za-z_][\\w.-]*);",
+              "name": "variable.other.entity.xml constant.character.entity.xml"
+            },
+            {
+              "match": "&",
+              "name": "invalid.illegal.bad-ampersand.xml"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

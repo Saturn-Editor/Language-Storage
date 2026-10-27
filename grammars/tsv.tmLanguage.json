@@ -1,0 +1,50 @@
+{
+  "name": "TSV",
+  "scopeName": "text.tsv",
+  "fileTypes": [
+    "tsv"
+  ],
+  "patterns": [
+    {
+      "match": "(?=[^\\n])(\"(?:[^\"]|\"\")*\"|[^\\t\"\\n]*)(\\t|$)(?:(\"(?:[^\"]|\"\")*\"|[^\\t\"\\n]*)(\\t|$))?(?:(\"(?:[^\"]|\"\")*\"|[^\\t\"\\n]*)(\\t|$))?(?:(\"(?:[^\"]|\"\")*\"|[^\\t\"\\n]*)(\\t|$))?(?:(\"(?:[^\"]|\"\")*\"|[^\\t\"\\n]*)(\\t|$))?(?:(\"(?:[^\"]|\"\")*\"|[^\\t\"\\n]*)(\\t|$))?",
+      "captures": {
+        "1": {
+          "name": "variable.other.column-1.tsv"
+        },
+        "2": {
+          "name": "punctuation.separator.tsv"
+        },
+        "3": {
+          "name": "string.unquoted.column-2.tsv"
+        },
+        "4": {
+          "name": "punctuation.separator.tsv"
+        },
+        "5": {
+          "name": "keyword.other.column-3.tsv"
+        },
+        "6": {
+          "name": "punctuation.separator.tsv"
+        },
+        "7": {
+          "name": "entity.name.function.column-4.tsv"
+        },
+        "8": {
+          "name": "punctuation.separator.tsv"
+        },
+        "9": {
+          "name": "entity.name.type.column-5.tsv"
+        },
+        "10": {
+          "name": "punctuation.separator.tsv"
+        },
+        "11": {
+          "name": "constant.numeric.column-6.tsv"
+        },
+        "12": {
+          "name": "punctuation.separator.tsv"
+        }
+      }
+    }
+  ]
+}
