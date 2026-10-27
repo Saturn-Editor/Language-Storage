@@ -23,8 +23,8 @@ jobs:
       - name: Read version
         id: meta
         run: |
-          version=$(jq -r .version saturn-module.json)
-          id=$(jq -r .id saturn-module.json)
+          version=$(jq -r .version saturn-language.json)
+          id=$(jq -r .id saturn-language.json)
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=v$version" >> "$GITHUB_OUTPUT"
           echo "zip=$id-$version.zip" >> "$GITHUB_OUTPUT"
@@ -45,7 +45,7 @@ jobs:
         if: steps.check.outputs.exists == 'false'
         id: zip
         run: |
-          # Tracked files only, with saturn-module.json at the zip root.
+          # Tracked files only, with saturn-language.json at the zip root.
           git archive --format=zip -o "${{ steps.meta.outputs.zip }}" HEAD -- . ':!.github' ':!.gitignore' ':!.idea' ':!test'
           echo "sha256=$(sha256sum "${{ steps.meta.outputs.zip }}" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
 

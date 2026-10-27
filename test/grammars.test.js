@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-const manifest = JSON.parse(readFileSync(new URL('../saturn-module.json', import.meta.url), 'utf8'));
+const manifest = JSON.parse(readFileSync(new URL('../saturn-language.json', import.meta.url), 'utf8'));
 
 /** Compiles an Oniguruma pattern as a JS RegExp, translating the one inline flag we use. */
 function compile(source) {

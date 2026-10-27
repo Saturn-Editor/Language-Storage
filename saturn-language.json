@@ -1,10 +1,10 @@
 {
   "id": "storage",
   "name": "Data & Storage",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "JSON, YAML, TOML, XML, INI/.env, CSV and SQL files",
   "badge": "{}",
-  "saturnApi": "^0.1",
+  "saturnApi": "^0.2",
   "main": "module.js",
   "activationEvents": [
     "workspaceContains:**/*.yaml",

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { activate } from '../module.js';
 
-const manifest = JSON.parse(readFileSync(new URL('../saturn-module.json', import.meta.url), 'utf8'));
+const manifest = JSON.parse(readFileSync(new URL('../saturn-language.json', import.meta.url), 'utf8'));
 
 function fakeSaturn() {
   const previews = new Map();

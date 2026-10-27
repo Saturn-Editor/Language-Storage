@@ -12,7 +12,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { FUNCTIONS, KEYWORDS, TYPES, readSchema } from '../lib/sql.js';
 
-const { version } = JSON.parse(readFileSync(new URL('../saturn-module.json', import.meta.url), 'utf8'));
+const { version } = JSON.parse(readFileSync(new URL('../saturn-language.json', import.meta.url), 'utf8'));
 
 const CompletionKind = { Text: 1, Function: 3, Field: 5, Variable: 6, Class: 7, Property: 10, Value: 12, Keyword: 14, Snippet: 15 };
 
