@@ -1,9 +1,8 @@
 {
   "id": "storage",
   "name": "Data & Storage",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "JSON, YAML, TOML, XML, INI/.env, CSV and SQL files",
-  "badge": "{}",
   "saturnApi": "^0.2",
   "main": "module.js",
   "activationEvents": [
@@ -83,20 +82,20 @@
       "args": ["server/server.js", "--stdio"]
     },
     "previews": [
-      { "id": "storage.json", "label": "JSON", "extensions": [".json", ".jsonc", ".jsonl", ".ndjson", ".geojson", ".webmanifest", ".har", ".babelrc"] },
-      { "id": "storage.yaml", "label": "YAML", "extensions": [".yaml", ".yml"] },
-      { "id": "storage.toml", "label": "TOML", "extensions": [".toml", "cargo.lock", "poetry.lock", "uv.lock"] },
-      { "id": "storage.xml", "label": "XML", "extensions": [".xml", ".xsd", ".xsl", ".xslt", ".plist", ".rss", ".atom", ".wsdl", ".kml", ".gpx"] },
+      { "id": "storage.json", "label": "JSON", "extensions": [".json", ".jsonc", ".jsonl", ".ndjson", ".geojson", ".webmanifest", ".har", ".babelrc"], "defaultView": "split" },
+      { "id": "storage.yaml", "label": "YAML", "extensions": [".yaml", ".yml"], "defaultView": "split" },
+      { "id": "storage.toml", "label": "TOML", "extensions": [".toml", "cargo.lock", "poetry.lock", "uv.lock"], "defaultView": "split" },
+      { "id": "storage.xml", "label": "XML", "extensions": [".xml", ".xsd", ".xsl", ".xslt", ".plist", ".rss", ".atom", ".wsdl", ".kml", ".gpx"], "defaultView": "split" },
       {
         "id": "storage.ini",
         "label": "Settings",
         "extensions": [
           ".ini", ".cfg", ".cnf", ".properties", ".editorconfig", ".gitconfig", ".npmrc",
           ".env", ".env.local", ".env.example", ".env.development", ".env.production", ".env.test"
-        ]
+        ], "defaultView": "split"
       },
-      { "id": "storage.csv", "label": "Table", "extensions": [".csv", ".tsv", ".tab"] },
-      { "id": "storage.sql", "label": "Schema", "extensions": [".sql", ".ddl"] }
+      { "id": "storage.csv", "label": "Table", "extensions": [".csv", ".tsv", ".tab"], "defaultView": "split" },
+      { "id": "storage.sql", "label": "Schema", "extensions": [".sql", ".ddl"], "defaultView": "split" }
     ],
     "fileTemplates": [
       { "id": "storage.jsonFile", "label": "JSON File", "kind": "file", "extension": ".json", "placeholder": "data" },
