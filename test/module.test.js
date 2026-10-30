@@ -1,21 +1,39 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { activate } from '../module.js';
 
 const manifest = JSON.parse(readFileSync(new URL('../saturn-language.json', import.meta.url), 'utf8'));
 
+/** Answers for showInput/showOpenDialog, open editor files, and what the module did. */
+const ui = { input: null, openDialog: null, editorFiles: new Map(), posted: [], opened: [] };
+
 function fakeSaturn() {
   const previews = new Map();
   const templates = new Map();
+  const webviews = new Map();
   activate({
     previews: { registerRenderer: (id, fn) => previews.set(id, fn) },
     files: { registerTemplate: (id, t) => templates.set(id, t) },
+    webviews: {
+      register: (id, provider) => webviews.set(id, provider),
+      postMessage: (id, message, projectPath) => ui.posted.push({ id, message, projectPath }),
+    },
+    workspace: {
+      findFiles: async (root) => [join(root, 'schema.sql')],
+      openFile: (projectPath, path, line) => ui.opened.push({ path, line }),
+      onDidChangeFiles: () => {},
+    },
+    editor: { file: (projectPath, path) => ui.editorFiles.get(path) ?? null, onDidChangeFile: () => {} },
+    window: { showInput: async () => ui.input, showOpenDialog: async () => ui.openDialog },
+    projects: { onDidClose: () => {} },
   });
-  return { previews, templates };
+  return { previews, templates, webviews };
 }
 
-const { previews, templates } = fakeSaturn();
+const { previews, templates, webviews } = fakeSaturn();
 const render = (id, text, path) => previews.get(id)(text, { path, projectPath: '/p' });
 
 test('every manifest preview and template has a handler', () => {
@@ -63,4 +81,56 @@ test('templates name and fill files', () => {
   assert.equal(templates.get('storage.yamlFile').fileName({ ...ctx, name: 'x.yml' }), 'x.yml');
   assert.match(templates.get('storage.xmlFile').content({ ...ctx, name: '1 bad name' }), /<badname>/);
   assert.match(templates.get('storage.tomlFile').content(ctx), /\[my-data\]/);
+});
+
+test('the SQL generator panel is registered and gets the project schema', async () => {
+  const project = mkdtempSync(join(tmpdir(), 'storage-panel-'));
+  writeFileSync(join(project, 'schema.sql'), 'CREATE TABLE users (id INT, email TEXT);\n');
+  const panel = webviews.get('storage.sqlGenerator');
+  assert.ok(manifest.contributes.panels.some((p) => p.id === 'storage.sqlGenerator' && p.kind === 'webview'));
+  const html = await panel.html({ projectPath: project });
+  assert.match(html, /"name":"users"/);
+  assert.match(html, /function generateSelect/);
+  assert.doesNotMatch(html, /^export /m);
+  // The generator and the page share one script, so a name declared in both would stop it loading.
+  assert.doesNotThrow(() => new Function(/<script>([\s\S]*)<\/script>/.exec(html)[1]));
+
+  // State survives a reload of the page.
+  await panel.onMessage({ type: 'state', state: { mode: 'insert', note: '</script>' } }, { projectPath: project });
+  const reloaded = await panel.html({ projectPath: project });
+  assert.match(reloaded, /"mode":"insert"/);
+  assert.match(reloaded, /\\u003c\/script>/, 'state is escaped inside the script');
+});
+
+test('the SQL generator writes new files and appends to existing ones', async () => {
+  const project = mkdtempSync(join(tmpdir(), 'storage-panel-'));
+  const panel = webviews.get('storage.sqlGenerator');
+  const ctx = { projectPath: project };
+  const lastStatus = () => ui.posted.filter((p) => p.message.type === 'status').at(-1).message;
+
+  ui.input = 'queries/../report';
+  writeFileSync(join(project, 'report.sql'), 'SELECT 0;');
+  await panel.onMessage({ type: 'newFile', sql: 'SELECT 1;' }, ctx);
+  assert.match(lastStatus().message, /already exists/);
+
+  ui.input = 'fresh';
+  await panel.onMessage({ type: 'newFile', sql: 'SELECT 1;' }, ctx);
+  assert.equal(readFileSync(join(project, 'fresh.sql'), 'utf8'), 'SELECT 1;\n');
+  assert.deepEqual(ui.opened.at(-1), { path: join(project, 'fresh.sql'), line: 1 });
+
+  ui.input = '../outside.sql';
+  await panel.onMessage({ type: 'newFile', sql: 'SELECT 1;' }, ctx);
+  assert.equal(lastStatus().kind, 'error');
+
+  ui.openDialog = [join(project, 'report.sql')];
+  await panel.onMessage({ type: 'append', sql: 'SELECT 2;' }, ctx);
+  assert.equal(readFileSync(join(project, 'report.sql'), 'utf8'), 'SELECT 0;\n\nSELECT 2;\n');
+  assert.deepEqual(ui.opened.at(-1), { path: join(project, 'report.sql'), line: 3 });
+
+  ui.editorFiles.set(join(project, 'report.sql'), { dirty: true, text: '' });
+  await panel.onMessage({ type: 'append', sql: 'SELECT 3;' }, ctx);
+  assert.match(lastStatus().message, /unsaved changes/);
+  assert.doesNotMatch(readFileSync(join(project, 'report.sql'), 'utf8'), /SELECT 3/);
+
+  await panel.onMessage({ type: 'unknown', sql: 'x' }, ctx);
 });

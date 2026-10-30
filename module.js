@@ -1,5 +1,7 @@
+import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { basename, dirname, extname, join } from 'node:path';
+import { appendFile, readFile, stat, writeFile } from 'node:fs/promises';
+import { basename, dirname, extname, isAbsolute, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseCsv, detectDelimiter } from './lib/csv.js';
 import { flavourOf, parseIni } from './lib/ini.js';
@@ -14,6 +16,14 @@ const here = dirname(fileURLToPath(import.meta.url));
 const previewCss = readFileSync(join(here, 'preview.css'), 'utf8');
 
 const wrap = (html) => `<style>${previewCss}</style>\n${html}`;
+
+const PANEL_ID = 'storage.sqlGenerator';
+// The page can't load modules, so the generator's source is inlined with its exports removed.
+const generatorSource = readFileSync(join(here, 'lib', 'sqlgen.js'), 'utf8').replace(/^export /gm, '');
+const panelHtml = readFileSync(join(here, 'panel', 'sql-generator.html'), 'utf8');
+const panelScript = readFileSync(join(here, 'panel', 'sql-generator.js'), 'utf8');
+/** JSON that is safe inside a <script> element. */
+const scriptJson = (value) => JSON.stringify(value).replace(/</g, '\\u003c');
 
 /** JSON Lines: one JSON value per non-blank line. */
 function parseJsonLines(text) {
@@ -91,7 +101,122 @@ const TEMPLATES = {
   'storage.sqlFile': { ext: '.sql', content: ({ name }) => `-- ${stem(name)}\n\n` },
 };
 
+const MAX_SCHEMA_FILES = 200;
+const MAX_SQL_BYTES = 2 * 1024 * 1024;
+
+/** Tables from the project's .sql files (open editors' unsaved text first). Later files win on a repeated name. */
+export async function projectSchema(saturn, projectPath) {
+  const files = (await saturn.workspace.findFiles(projectPath, '**/*.{sql,ddl}')).slice(0, MAX_SCHEMA_FILES);
+  const tables = new Map();
+  for (const file of files) {
+    try {
+      const open = saturn.editor.file(projectPath, file);
+      if (!open && (await stat(file)).size > MAX_SQL_BYTES) continue;
+      for (const t of readSchema(open?.text ?? (await readFile(file, 'utf8'))).tables) tables.set(t.name.toLowerCase(), t);
+    } catch {
+      // Unreadable or unparseable files are skipped.
+    }
+  }
+  return { tables: [...tables.values()].sort((a, b) => a.name.localeCompare(b.name)) };
+}
+
+/** Copies text with the platform's clipboard tool; rejects if none works. */
+export function copyToClipboard(text, platform = process.platform, env = process.env) {
+  const candidates = platform === 'darwin' ? [['pbcopy', []]]
+    : platform === 'win32' ? [['clip', []]]
+    : [...(env.WAYLAND_DISPLAY ? [['wl-copy', []]] : []), ['xclip', ['-selection', 'clipboard']], ['xsel', ['--clipboard', '--input']]];
+  // clip.exe reads UTF-16 with a byte-order mark; the others read UTF-8.
+  const input = platform === 'win32' ? Buffer.from(`\uFEFF${text}`, 'utf16le') : Buffer.from(text, 'utf8');
+  const attempt = ([command, args]) => new Promise((resolve, reject) => {
+    const child = spawn(command, args, { stdio: ['pipe', 'ignore', 'ignore'] });
+    child.on('error', reject);
+    child.on('exit', (code) => (code === 0 ? resolve() : reject(new Error(`${command} exited with ${code}`))));
+    child.stdin.end(input);
+  });
+  return candidates.reduce((chain, c) => chain.catch(() => attempt(c)), Promise.reject(new Error('no clipboard tool')));
+}
+
+const sqlFileName = (name) => (/\.(sql|ddl)$/i.test(name) ? name : `${name}.sql`);
+
+/** The SQL Generator panel: its state per project lives here so theme reloads keep it. */
+function registerSqlGenerator(saturn) {
+  const states = new Map();
+  const status = (projectPath, message, kind = 'info') => saturn.webviews.postMessage(PANEL_ID, { type: 'status', message, kind }, projectPath);
+
+  const outputs = {
+    async copy({ projectPath }, sql) {
+      try {
+        await copyToClipboard(sql);
+        status(projectPath, 'Copied to the clipboard.');
+      } catch {
+        status(projectPath, 'Couldn\'t reach the clipboard: select the SQL and copy it yourself.', 'error');
+      }
+    },
+    async newFile({ projectPath }, sql) {
+      const name = await saturn.window.showInput(projectPath, { title: 'New SQL file', value: 'query.sql', placeholder: 'Path in the project, e.g. queries/report.sql' });
+      if (!name?.trim()) return;
+      const path = isAbsolute(name.trim()) ? name.trim() : join(projectPath, sqlFileName(name.trim()));
+      if (relative(projectPath, path).startsWith('..')) return status(projectPath, 'Pick a path inside the project.', 'error');
+      try {
+        await writeFile(path, `${sql}\n`, { flag: 'wx' });
+      } catch (e) {
+        return status(projectPath, e.code === 'EEXIST' ? `${basename(path)} already exists: pick another name, or use Append.` : `Couldn't create ${basename(path)}: ${e.message}`, 'error');
+      }
+      saturn.workspace.openFile(projectPath, path, 1, 1);
+      status(projectPath, `Created ${relative(projectPath, path)}.`);
+    },
+    async append({ projectPath }, sql) {
+      const [path] = (await saturn.window.showOpenDialog(projectPath, { title: 'Append SQL to…', filters: [{ name: 'SQL', extensions: ['sql', 'ddl'] }] })) ?? [];
+      if (!path) return;
+      // Writing under unsaved edits would lose one side or the other.
+      if (saturn.editor.file(projectPath, path)?.dirty) return status(projectPath, `${basename(path)} has unsaved changes: save it, then append.`, 'error');
+      let existing = '';
+      try {
+        existing = await readFile(path, 'utf8');
+      } catch {
+        // A missing file is created by appendFile.
+      }
+      const separator = !existing ? '' : existing.endsWith('\n\n') ? '' : existing.endsWith('\n') ? '\n' : '\n\n';
+      try {
+        await appendFile(path, `${separator}${sql}\n`);
+      } catch (e) {
+        return status(projectPath, `Couldn't write ${basename(path)}: ${e.message}`, 'error');
+      }
+      const line = (existing + separator).split('\n').length;
+      saturn.workspace.openFile(projectPath, path, line, 1);
+      status(projectPath, `Appended to ${basename(path)}.`);
+    },
+  };
+
+  saturn.webviews.register(PANEL_ID, {
+    async html(ctx) {
+      const initial = { state: states.get(ctx.projectPath) ?? null, schema: await projectSchema(saturn, ctx.projectPath) };
+      return `${panelHtml}\n<script>\nconst INITIAL = ${scriptJson(initial)};\n${generatorSource}\n${panelScript}</script>`;
+    },
+    async onMessage(message, ctx) {
+      if (message?.type === 'state') states.set(ctx.projectPath, message.state);
+      else if (typeof message?.sql === 'string' && Object.hasOwn(outputs, message.type)) await outputs[message.type](ctx, message.sql);
+    },
+  });
+
+  // New or edited CREATE TABLEs show up in the panel.
+  const refresh = async (projectPath) => saturn.webviews.postMessage(PANEL_ID, { type: 'schema', schema: await projectSchema(saturn, projectPath) }, projectPath);
+  let timer;
+  saturn.workspace.onDidChangeFiles(({ projectPath }) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => void refresh(projectPath).catch(() => undefined), 500);
+  });
+  saturn.editor.onDidChangeFile(({ projectPath, file }) => {
+    if (file.languageId !== 'sql') return;
+    clearTimeout(timer);
+    timer = setTimeout(() => void refresh(projectPath).catch(() => undefined), 1000);
+  });
+  saturn.projects.onDidClose(({ projectPath }) => states.delete(projectPath));
+}
+
 export function activate(saturn) {
+  registerSqlGenerator(saturn);
+
   for (const [id, render] of Object.entries(RENDERERS)) {
     saturn.previews.registerRenderer(id, (text, ctx) => {
       try {

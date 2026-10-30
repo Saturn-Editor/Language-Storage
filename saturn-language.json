@@ -1,9 +1,9 @@
 {
   "id": "storage",
   "name": "Data & Storage",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "JSON, YAML, TOML, XML, INI/.env, CSV and SQL files",
-  "saturnApi": "^0.2",
+  "saturnApi": "^0.5",
   "main": "module.js",
   "activationEvents": [
     "workspaceContains:**/*.yaml",
@@ -12,7 +12,15 @@
     "workspaceContains:**/*.xml",
     "workspaceContains:**/*.csv",
     "workspaceContains:**/*.tsv",
-    "workspaceContains:**/*.sql"
+    "workspaceContains:**/*.sql",
+    "onLanguage:json",
+    "onLanguage:yaml",
+    "onLanguage:toml",
+    "onLanguage:xml",
+    "onLanguage:ini",
+    "onLanguage:csv",
+    "onLanguage:tsv",
+    "onLanguage:sql"
   ],
   "contributes": {
     "languages": [
@@ -77,7 +85,7 @@
       }
     ],
     "languageServer": {
-      "languages": ["json", "yaml", "toml", "xml", "ini", "sql"],
+      "languages": ["json", "yaml", "toml", "xml", "ini", "csv", "tsv", "sql"],
       "command": "node",
       "args": ["server/server.js", "--stdio"]
     },
@@ -96,6 +104,9 @@
       },
       { "id": "storage.csv", "label": "Table", "extensions": [".csv", ".tsv", ".tab"], "defaultView": "split" },
       { "id": "storage.sql", "label": "Schema", "extensions": [".sql", ".ddl"], "defaultView": "split" }
+    ],
+    "panels": [
+      { "id": "storage.sqlGenerator", "title": "SQL Generator", "dock": "bottom", "kind": "webview", "icon": "sql-generator.svg", "showWhen": ["**/*.sql", "**/*.ddl"] }
     ],
     "fileTemplates": [
       { "id": "storage.jsonFile", "label": "JSON File", "kind": "file", "extension": ".json", "placeholder": "data" },

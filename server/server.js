@@ -1,6 +1,7 @@
 /**
  * A minimal language server for the data formats over stdio (JSON-RPC with Content-Length framing).
- * Supports full-text sync and textDocument/completion:
+ * Supports full-text sync, diagnostics with quick fixes, document symbols, formatting (JSON, XML),
+ * inlay hints (CSV/TSV column names), references and CodeLens (SQL tables), and completion:
  *   - JSON, YAML, TOML, INI: keys already used in the document, table/section names, true/false/null
  *   - XML: element names used in the document, and the closing tag for the open element
  *   - SQL: keywords, types, functions, and tables and columns from CREATE TABLE statements in the
@@ -9,7 +10,12 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { lineIndex } from '../lib/common.js';
+import { detectDelimiter, fieldsWithOffsets } from '../lib/csv.js';
+import { diagnose, quickFixes } from '../lib/diagnostics.js';
+import { format } from '../lib/format.js';
+import { outline, sqlCode, sqlDefinitions } from '../lib/outline.js';
 import { FUNCTIONS, KEYWORDS, TYPES, readSchema } from '../lib/sql.js';
 
 const { version } = JSON.parse(readFileSync(new URL('../saturn-language.json', import.meta.url), 'utf8'));
@@ -62,23 +68,44 @@ const handlers = {
       capabilities: {
         textDocumentSync: 1,
         completionProvider: { triggerCharacters: ['"', '[', '<', '/', '.'] },
+        codeActionProvider: { codeActionKinds: ['quickfix'] },
+        documentSymbolProvider: true,
+        documentFormattingProvider: true,
+        inlayHintProvider: true,
+        referencesProvider: true,
+        codeLensProvider: { resolveProvider: false },
       },
       serverInfo: { name: 'saturn-storage', version },
     };
   },
   shutdown: () => null,
   'textDocument/completion': (params) => complete(params),
+  'textDocument/codeAction': ({ textDocument, context }) =>
+    quickFixes(textOf(textDocument.uri), textDocument.uri, (context?.diagnostics ?? []).filter((d) => d.source === 'storage')),
+  'textDocument/documentSymbol': ({ textDocument }) =>
+    outline(textOf(textDocument.uri), languageOf(textDocument.uri, documents.get(textDocument.uri)), toPath(textDocument.uri)),
+  'textDocument/formatting': ({ textDocument, options }) => formatting(textDocument.uri, options),
+  'textDocument/inlayHint': ({ textDocument, range }) => inlayHints(textDocument.uri, range),
+  'textDocument/references': (params) => references(params),
+  'textDocument/codeLens': ({ textDocument }) => codeLenses(textDocument.uri),
 };
 
 const notifications = {
   exit: () => process.exit(0),
-  'textDocument/didOpen': ({ textDocument }) => documents.set(textDocument.uri, { text: textDocument.text, languageId: textDocument.languageId }),
+  'textDocument/didOpen': ({ textDocument }) => {
+    documents.set(textDocument.uri, { text: textDocument.text, languageId: textDocument.languageId });
+    publishDiagnostics(textDocument.uri);
+  },
   'textDocument/didChange': ({ textDocument, contentChanges }) => {
     const last = contentChanges[contentChanges.length - 1];
     const doc = documents.get(textDocument.uri);
     if (last && !last.range) documents.set(textDocument.uri, { text: last.text, languageId: doc?.languageId });
+    publishDiagnostics(textDocument.uri);
   },
-  'textDocument/didClose': ({ textDocument }) => documents.delete(textDocument.uri),
+  'textDocument/didClose': ({ textDocument }) => {
+    documents.delete(textDocument.uri);
+    send({ method: 'textDocument/publishDiagnostics', params: { uri: textDocument.uri, diagnostics: [] } });
+  },
 };
 
 async function dispatch(message) {
@@ -98,6 +125,117 @@ async function dispatch(message) {
   }
 }
 
+// ---- Diagnostics, formatting and inlay hints ----
+
+const MAX_DIAGNOSE_BYTES = 5 * 1024 * 1024;
+const textOf = (uri) => documents.get(uri)?.text ?? readOrEmpty(toPath(uri));
+
+function publishDiagnostics(uri) {
+  const doc = documents.get(uri);
+  if (!doc) return;
+  const diagnostics = doc.text.length > MAX_DIAGNOSE_BYTES ? [] : diagnose(doc.text, languageOf(uri, doc), toPath(uri));
+  send({ method: 'textDocument/publishDiagnostics', params: { uri, diagnostics } });
+}
+
+function formatting(uri, options) {
+  const text = textOf(uri);
+  const formatted = format(text, languageOf(uri, documents.get(uri)), toPath(uri), options);
+  if (formatted === null) return [];
+  return [{ range: { start: { line: 0, character: 0 }, end: lineIndex(text).position(text.length) }, newText: formatted }];
+}
+
+/** CSV/TSV: the column's header name before each field of the data rows in range. */
+function inlayHints(uri, range) {
+  const language = languageOf(uri, documents.get(uri));
+  if (language !== 'csv' && language !== 'tsv') return [];
+  const text = textOf(uri);
+  const rows = fieldsWithOffsets(text, detectDelimiter(text, toPath(uri)));
+  const header = rows[0]?.map((f) => f.value.trim()) ?? [];
+  if (header.length < 2) return [];
+  const { position } = lineIndex(text);
+  const hints = [];
+  for (const row of rows.slice(1)) {
+    const first = position(row[0].offset);
+    if (first.line > range.end.line) break;
+    if (first.line < range.start.line || (row.length === 1 && !row[0].value)) continue;
+    row.forEach((field, column) => {
+      if (header[column]) hints.push({ position: position(field.offset), label: `${header[column]}:`, paddingRight: true });
+    });
+  }
+  return hints;
+}
+
+// ---- SQL references and CodeLens ----
+
+/** The identifier at a position in `text`. */
+function wordAt(text, position) {
+  const lineText = text.split(/\r?\n/)[position.line] ?? '';
+  const before = /[\w$]*$/.exec(lineText.slice(0, position.character))[0];
+  const after = /^[\w$]*/.exec(lineText.slice(position.character))[0];
+  return before + after;
+}
+
+/** This file and the project's other .sql files, preferring the editor's text for open ones. */
+async function sqlFiles(uri) {
+  const path = toPath(uri);
+  const files = [{ uri, text: textOf(uri) }];
+  for (const s of await projectSchemas()) {
+    if (s.path === path) continue;
+    const href = pathToFileURL(s.path).href;
+    files.push({ uri: href, text: documents.get(href)?.text ?? s.text });
+  }
+  return files;
+}
+
+/** Whole-word, case-insensitive uses of `name` outside comments and strings. */
+function occurrences(files, name) {
+  const re = new RegExp(`(?<![\\w$])${name.replace(/[$]/g, '\\$')}(?![\\w$])`, 'gi');
+  return files.flatMap((f) => {
+    const { position } = lineIndex(f.text);
+    return [...sqlCode(f.text).matchAll(re)].map((m) => ({ uri: f.uri, range: { start: position(m.index), end: position(m.index + name.length) } }));
+  });
+}
+
+/** Where the last part of a CREATE statement's name starts (inside any quotes). */
+function nameStart(text, d) {
+  const end = d.nameOffset + d.nameLength - (/["`\]]/.test(text[d.nameOffset + d.nameLength - 1]) ? 1 : 0);
+  return end - d.name.split('.').pop().length;
+}
+
+/** Uses of `name` that aren't the name in its own CREATE statement. */
+function uses(files, name) {
+  const definitions = new Set(files.flatMap((f) => sqlDefinitions(f.text)
+    .filter((d) => d.name.split('.').pop().toLowerCase() === name.toLowerCase())
+    .map((d) => `${f.uri}:${nameStart(f.text, d)}`)));
+  return occurrences(files, name).filter((l) => {
+    const { offset } = lineIndex(files.find((f) => f.uri === l.uri).text);
+    return !definitions.has(`${l.uri}:${offset(l.range.start)}`);
+  });
+}
+
+async function references({ textDocument, position, context }) {
+  if (languageOf(textDocument.uri, documents.get(textDocument.uri)) !== 'sql') return [];
+  const name = wordAt(textOf(textDocument.uri), position);
+  if (!/^[A-Za-z_]/.test(name)) return [];
+  const files = await sqlFiles(textDocument.uri);
+  return context?.includeDeclaration === false ? uses(files, name) : occurrences(files, name);
+}
+
+/** "N references" above each CREATE TABLE and CREATE VIEW. */
+async function codeLenses(uri) {
+  if (languageOf(uri, documents.get(uri)) !== 'sql') return [];
+  const files = await sqlFiles(uri);
+  const text = files[0].text;
+  const { position } = lineIndex(text);
+  return sqlDefinitions(text).filter((d) => d.kind === 'table' || d.kind === 'view').map((d) => {
+    const n = uses(files, d.name.split('.').pop()).length;
+    return {
+      range: { start: position(d.start), end: position(d.start) },
+      command: { title: `${n} reference${n === 1 ? '' : 's'}`, command: 'storage.showReferences', arguments: [position(nameStart(text, d))] },
+    };
+  });
+}
+
 // ---- Completion ----
 
 const toPath = (uri) => (uri.startsWith('file:') ? fileURLToPath(uri) : uri);
@@ -111,6 +249,8 @@ const LANGUAGE_BY_EXTENSION = [
   [/(\.toml|cargo\.lock|poetry\.lock|uv\.lock)$/i, 'toml'],
   [/\.(xml|xsd|xslt?|plist|rss|atom|wsdl|kml|gpx)$/i, 'xml'],
   [/\.(sql|ddl)$/i, 'sql'],
+  [/\.csv$/i, 'csv'],
+  [/\.(tsv|tab)$/i, 'tsv'],
 ];
 
 function languageOf(uri, doc) {
@@ -138,6 +278,9 @@ async function complete({ textDocument, position }) {
       return xmlItems(ctx);
     case 'sql':
       return sqlItems(ctx);
+    case 'csv':
+    case 'tsv':
+      return [];
     default:
       return iniItems(ctx);
   }
@@ -323,7 +466,8 @@ async function projectSchemas() {
   for (const file of files) {
     try {
       if ((await stat(file)).size > MAX_SQL_BYTES) continue;
-      schemas.push({ path: file, tables: safeSchema(await readFile(file, 'utf8')).tables });
+      const text = await readFile(file, 'utf8');
+      schemas.push({ path: file, text, tables: safeSchema(text).tables });
     } catch {
       // Unreadable files are skipped.
     }

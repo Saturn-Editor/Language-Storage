@@ -1,0 +1,72 @@
+<style>
+  * { box-sizing: border-box; }
+  body { display: flex; flex-direction: column; overflow: hidden; }
+  button, input, select { font: inherit; color: var(--saturn-text); }
+  input, select {
+    background: var(--saturn-editor); border: 1px solid var(--saturn-border); border-radius: 4px;
+    padding: 2px 6px; min-width: 0; height: 24px;
+  }
+  input:focus, select:focus, button:focus-visible { outline: 1px solid var(--saturn-accent); outline-offset: -1px; }
+  input[type="checkbox"] { height: auto; accent-color: var(--saturn-accent); }
+  button {
+    background: var(--saturn-raised); border: 1px solid var(--saturn-border); border-radius: 4px;
+    padding: 2px 10px; height: 24px; cursor: pointer; white-space: nowrap;
+  }
+  button:hover { background: var(--saturn-hover); }
+  button.primary { background: var(--saturn-accent); border-color: var(--saturn-accent); color: var(--saturn-app); }
+  button.link { background: none; border: none; color: var(--saturn-accent); padding: 0 4px; }
+  button.remove { background: none; border: none; color: var(--saturn-muted); padding: 0 6px; }
+  button.remove:hover { color: var(--saturn-error); }
+
+  .bar { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--saturn-divider); flex-wrap: wrap; }
+  .tabs { display: flex; gap: 2px; flex: 1; flex-wrap: wrap; }
+  .tabs button { background: none; border: none; border-radius: 4px; color: var(--saturn-muted); }
+  .tabs button[aria-selected="true"] { background: var(--saturn-selection); color: var(--saturn-strong); }
+
+  main { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); min-height: 0; }
+  @media (max-width: 720px) { main { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); } }
+  #form { overflow: auto; padding: 8px 10px 16px; border-right: 1px solid var(--saturn-divider); }
+  #result { display: flex; flex-direction: column; min-height: 0; }
+  #sql {
+    flex: 1; margin: 0; padding: 10px; overflow: auto; white-space: pre; user-select: text;
+    font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--saturn-strong);
+    background: var(--saturn-editor);
+  }
+  #sql:empty::before { content: attr(data-empty); color: var(--saturn-muted); font-family: system-ui, sans-serif; }
+  .actions { display: flex; gap: 6px; padding: 6px 10px; border-top: 1px solid var(--saturn-divider); align-items: center; flex-wrap: wrap; }
+  #status { color: var(--saturn-muted); margin-left: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #status.error { color: var(--saturn-error); }
+
+  section { margin-top: 10px; }
+  section > h3 {
+    display: flex; align-items: center; justify-content: space-between; margin: 0 0 4px;
+    font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--saturn-muted);
+  }
+  .row { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+  .row > input:not([type="checkbox"]), .row > select { flex: 1; }
+  .row > .narrow { flex: 0 0 82px; }
+  .row label { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; color: var(--saturn-muted); }
+  .hint { color: var(--saturn-muted); margin: 4px 0; }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0; }
+  .chips button { height: 22px; padding: 0 8px; border-radius: 11px; }
+  .column-card { border: 1px solid var(--saturn-divider); border-radius: 6px; padding: 4px 6px; margin: 6px 0; }
+  .column-card .row { margin: 3px 0; }
+  .flags { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+</style>
+
+<div class="bar">
+  <div class="tabs" role="tablist" id="tabs"></div>
+  <select id="dialect" aria-label="SQL dialect"></select>
+</div>
+<main>
+  <div id="form"></div>
+  <div id="result">
+    <pre id="sql" data-empty="Pick a table to start." aria-label="Generated SQL" aria-live="polite"></pre>
+    <div class="actions">
+      <button class="primary" data-output="copy">Copy</button>
+      <button data-output="newFile">New file…</button>
+      <button data-output="append">Append to file…</button>
+      <span id="status" role="status"></span>
+    </div>
+  </div>
+</main>
