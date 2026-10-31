@@ -1,7 +1,7 @@
 {
   "id": "storage",
   "name": "Data & Storage",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "JSON, YAML, TOML, XML, INI/.env, CSV and SQL files",
   "saturnApi": "^1.0",
   "main": "module.js",
