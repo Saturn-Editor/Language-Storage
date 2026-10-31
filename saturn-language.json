@@ -1,56 +1,35 @@
 {
   "id": "storage",
   "name": "Data & Storage",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "JSON, YAML, TOML, XML, INI/.env, CSV and SQL files",
-  "saturnApi": "^0.5",
+  "saturnApi": "^1.0",
   "main": "module.js",
-  "activationEvents": [
-    "workspaceContains:**/*.yaml",
-    "workspaceContains:**/*.yml",
-    "workspaceContains:**/*.toml",
-    "workspaceContains:**/*.xml",
-    "workspaceContains:**/*.csv",
-    "workspaceContains:**/*.tsv",
-    "workspaceContains:**/*.sql",
-    "onLanguage:json",
-    "onLanguage:yaml",
-    "onLanguage:toml",
-    "onLanguage:xml",
-    "onLanguage:ini",
-    "onLanguage:csv",
-    "onLanguage:tsv",
-    "onLanguage:sql"
-  ],
   "contributes": {
     "languages": [
       {
         "id": "json",
         "name": "JSON",
         "extensions": [".json", ".jsonc", ".jsonl", ".ndjson", ".geojson", ".webmanifest", ".har", ".babelrc"],
-        "grammar": "grammars/json.tmLanguage.json",
-        "scopeName": "source.json"
+        "grammar": "grammars/json.tmLanguage.json"
       },
       {
         "id": "yaml",
         "name": "YAML",
         "extensions": [".yaml", ".yml"],
-        "grammar": "grammars/yaml.tmLanguage.json",
-        "scopeName": "source.yaml"
+        "grammar": "grammars/yaml.tmLanguage.json"
       },
       {
         "id": "toml",
         "name": "TOML",
         "extensions": [".toml", "cargo.lock", "poetry.lock", "uv.lock"],
-        "grammar": "grammars/toml.tmLanguage.json",
-        "scopeName": "source.toml"
+        "grammar": "grammars/toml.tmLanguage.json"
       },
       {
         "id": "xml",
         "name": "XML",
         "extensions": [".xml", ".xsd", ".xsl", ".xslt", ".plist", ".rss", ".atom", ".wsdl", ".kml", ".gpx"],
-        "grammar": "grammars/xml.tmLanguage.json",
-        "scopeName": "text.xml"
+        "grammar": "grammars/xml.tmLanguage.json"
       },
       {
         "id": "ini",
@@ -59,33 +38,28 @@
           ".ini", ".cfg", ".cnf", ".properties", ".editorconfig", ".gitconfig", ".npmrc",
           ".env", ".env.local", ".env.example", ".env.development", ".env.production", ".env.test"
         ],
-        "grammar": "grammars/ini.tmLanguage.json",
-        "scopeName": "source.ini"
+        "grammar": "grammars/ini.tmLanguage.json"
       },
       {
         "id": "csv",
         "name": "CSV",
         "extensions": [".csv"],
-        "grammar": "grammars/csv.tmLanguage.json",
-        "scopeName": "text.csv"
+        "grammar": "grammars/csv.tmLanguage.json"
       },
       {
         "id": "tsv",
         "name": "TSV",
         "extensions": [".tsv", ".tab"],
-        "grammar": "grammars/tsv.tmLanguage.json",
-        "scopeName": "text.tsv"
+        "grammar": "grammars/tsv.tmLanguage.json"
       },
       {
         "id": "sql",
         "name": "SQL",
         "extensions": [".sql", ".ddl"],
-        "grammar": "grammars/sql.tmLanguage.json",
-        "scopeName": "source.sql"
+        "grammar": "grammars/sql.tmLanguage.json"
       }
     ],
     "languageServer": {
-      "languages": ["json", "yaml", "toml", "xml", "ini", "csv", "tsv", "sql"],
       "command": "node",
       "args": ["server/server.js", "--stdio"]
     },
