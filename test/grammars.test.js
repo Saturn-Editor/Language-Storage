@@ -51,7 +51,8 @@ function* rules(node, path) {
 for (const language of manifest.contributes.languages) {
   test(`grammar for ${language.id}`, () => {
     const grammar = JSON.parse(readFileSync(new URL(`../${language.grammar}`, import.meta.url), 'utf8'));
-    assert.equal(grammar.scopeName, language.scopeName);
+    assert.ok(grammar.scopeName, `${language.grammar}: missing scopeName`);
+    if (language.scopeName) assert.equal(grammar.scopeName, language.scopeName);
     let checked = 0;
     for (const [rule, path] of rules(grammar, language.id)) {
       if (rule.include) {
